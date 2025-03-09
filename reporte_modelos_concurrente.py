@@ -3,6 +3,7 @@ import pandas as pd
 
 import asyncio
 from ollama import AsyncClient
+import os
 
 df = pd.read_csv('labeled_data.csv')
 
@@ -91,12 +92,22 @@ async def main():
         
                 model_predictions[model].append(enviar_prompt(message, model))
         
-        for model in models:
-        # Sustituimos el array de llamadas por un array de resultados para cada array de peticiones a modelos. Ya que la operación devuelve un array respuestas
-            model_predictions[model] = await asyncio.gather(*model_predictions[model])
-        
-        for model in models:
-            model_predictions[model] = [deleteThink(text) for text in model_predictions[model]]
+            for model in models:
+            # Sustituimos el array de llamadas por un array de resultados para cada array de peticiones a modelos. Ya que la operación devuelve un array respuestas
+                model_predictions[model] = await asyncio.gather(*model_predictions[model])
+            
+            for model in models:
+                model_predictions[model] = [deleteThink(text) for text in model_predictions[model]]
+
+            dfModelPredictions = pd.DataFrame(model_predictions)
+
+            finalDataFrame = pd.concat([df.reset_index(drop=True), dfModelPredictions.reset_index(drop=True)], axis=1) # concat 0 se unen ampliando las filas, 1 no
+
+
+            # Verificar si el archivo ya existe para manejar el encabezado
+            file_exists = os.path.isfile("modelEvaluation.csv")
+
+            finalDataFrame.to_csv("modelEvaluation.csv", mode='a', header=not file_exists, index=False, encoding='utf-8')
     
 
 
@@ -107,8 +118,4 @@ async def main():
 if __name__ == '__main__':
     asyncio.run(main())
 
-dfModelPredictions = pd.DataFrame(model_predictions)
 
-finalDataFrame = pd.concat([df.reset_index(drop=True), dfModelPredictions.reset_index(drop=True)], axis=1) # concat 0 se unen ampliando las filas, 1 no
-
-finalDataFrame.to_csv("modelEvaluation.csv", index=False)
