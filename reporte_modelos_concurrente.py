@@ -7,16 +7,11 @@ import os
 
 df = pd.read_csv('labeled_data.csv')
 
-#df = df.sample(n=10, random_state=42).copy()  # random_state para reproducibilidad
+df = df.sample(n=45, random_state=42).copy()  # random_state para reproducibilidad
 
 print(df.head())
 
-model_predictions = {
-                    "deepseek-r1:1.5b" : [],
-                "deepseek-r1:7b" : [],
-                "deepseek-r1:8b" : []
 
-}
 
 models = [ #buscar como se llaman cada uno de los modelos.
             "deepseek-r1:1.5b",
@@ -49,11 +44,22 @@ def deleteThink(texto):
     return texto_limpio.strip()
 
 async def main():
+
+    if os.path.exists("modelEvaluation.csv"):
+        os.remove("modelEvaluation.csv")
     
     for i in range(0, len(df), 30):
 
         batch_tweets = df['tweet'].iloc[i:i+30]
 
+        model_predictions = {
+                            "deepseek-r1:1.5b" : [],
+                        "deepseek-r1:7b" : [],
+                        "deepseek-r1:8b" : []
+
+        }
+
+        promises = []
         for tweet in batch_tweets:
 
         
@@ -89,25 +95,26 @@ async def main():
         
             for model in models:
                 # Procesar las líneas JSON y extraer texto
+                promises.append((model, enviar_prompt(message, model)))
+
+        results = await asyncio.gather(*(promise[1] for promise in promises))
+         
         
-                model_predictions[model].append(enviar_prompt(message, model))
-        
-            for model in models:
-            # Sustituimos el array de llamadas por un array de resultados para cada array de peticiones a modelos. Ya que la operación devuelve un array respuestas
-                model_predictions[model] = await asyncio.gather(*model_predictions[model])
-            
-            for model in models:
-                model_predictions[model] = [deleteThink(text) for text in model_predictions[model]]
+        for idx, (model, _) in enumerate(promises):
+            if model_predictions[model] is None:
+                model_predictions[model] = []
+            model_predictions[model].append(deleteThink(results[idx]))
 
-            dfModelPredictions = pd.DataFrame(model_predictions)
+        dfModelPredictions = pd.DataFrame(model_predictions)
 
-            finalDataFrame = pd.concat([df.reset_index(drop=True), dfModelPredictions.reset_index(drop=True)], axis=1) # concat 0 se unen ampliando las filas, 1 no
+        finalDataFrame = pd.concat([df.iloc[i:i+30].reset_index(drop=True), dfModelPredictions.reset_index(drop=True)], axis=1) # concat 0 se unen ampliando las filas, 1 no
 
+        print(finalDataFrame)
 
-            # Verificar si el archivo ya existe para manejar el encabezado
-            file_exists = os.path.isfile("modelEvaluation.csv")
+        # Verificar si el archivo ya existe para manejar el encabezado
+        file_exists = os.path.isfile("modelEvaluation.csv")
 
-            finalDataFrame.to_csv("modelEvaluation.csv", mode='a', header=not file_exists, index=False, encoding='utf-8')
+        finalDataFrame.to_csv("modelEvaluation.csv", mode='a', header=not file_exists, index=False, encoding='utf-8')
     
 
 
