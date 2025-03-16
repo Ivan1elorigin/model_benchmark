@@ -52,12 +52,7 @@ async def main():
 
         batch_tweets = df['tweet'].iloc[i:i+30]
 
-        model_predictions = {
-                            "deepseek-r1:1.5b" : [],
-                        "deepseek-r1:7b" : [],
-                        "deepseek-r1:8b" : []
-
-        }
+        model_predictions = {model: [] for model in models}
 
         promises = []
         for tweet in batch_tweets:
@@ -98,12 +93,19 @@ async def main():
                 promises.append((model, enviar_prompt(message, model)))
 
         results = await asyncio.gather(*(promise[1] for promise in promises))
-         
         
-        for idx, (model, _) in enumerate(promises):
-            if model_predictions[model] is None:
-                model_predictions[model] = []
-            model_predictions[model].append(deleteThink(results[idx]))
+        num_models = len(models)
+        for tweet_idx in range(len(batch_tweets)):
+            for model_idx, model in enumerate(models):
+                result_idx = tweet_idx * num_models + model_idx
+                if result_idx < len(results):
+                    model_predictions[model].append(deleteThink(results[result_idx]))
+
+        
+        # for idx, (model, _) in enumerate(promises):
+        #     # if model_predictions[model] is None:
+        #     #     model_predictions[model] = []
+        #     model_predictions[model].append(deleteThink(results[idx]))
 
         dfModelPredictions = pd.DataFrame(model_predictions)
 
